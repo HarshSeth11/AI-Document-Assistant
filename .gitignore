@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.pyc
+
+# Virtual environments
+venv/
+env/
+ai_env/
+ai_env311/
+.venv/
+
+# API Keys — NEVER commit these
+.env
+*.env
+secrets.py
+config.py
+
+# ML Models & Cache — too large for git
+*.safetensors
+*.bin
+*.pt
+*.pth
+.cache/
+huggingface/
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Logs
+*.log
+logs/
