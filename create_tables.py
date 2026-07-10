@@ -1,5 +1,5 @@
-from database import engine, Base
-from models import Document, Chunk, ChatSession, Message
+from app.database import engine, Base
+from app.models import Document, Chunk, ChatSession, Message
 
 def create_all_tables():
     Base.metadata.create_all(bind=engine)

@@ -44,3 +44,5 @@ desktop.ini
 # Logs
 *.log
 logs/
+
+uploads/

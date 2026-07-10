@@ -2,7 +2,7 @@ import os
 from langchain_community.document_loaders import TextLoader, PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sqlalchemy.orm import Session
-from models import Document, Chunk
+from app.models import Document, Chunk
 
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)

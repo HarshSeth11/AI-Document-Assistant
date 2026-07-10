@@ -1,4 +1,4 @@
-from document_service import load_document, chunk_document
+from app.document_service import load_document, chunk_document
 
 print("Loading...")
 docs = load_document("sample_policy.txt", "txt")

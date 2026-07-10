@@ -1,8 +1,8 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from sqlalchemy.orm import Session
-from database import get_db, engine, Base
-from models import Document
-import document_service
+from app.database import get_db, engine, Base
+from app.models import Document
+import app.document_service as document_service
 
 Base.metadata.create_all(bind=engine)
 

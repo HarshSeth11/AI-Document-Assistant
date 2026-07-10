@@ -1,5 +1,5 @@
-from database import SessionLocal
-from models import Document
+from app.database import SessionLocal
+from app.models import Document
 
 db = SessionLocal()
 
