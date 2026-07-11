@@ -3,6 +3,7 @@ from langchain_community.document_loaders import TextLoader, PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sqlalchemy.orm import Session
 from app.models import Document, Chunk
+from app.vector_service import embed_and_store_chunks
 
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -75,6 +76,11 @@ def process_document(
                 chroma_id=None
             )
             db.add(chunk_record)
+        db.commit()
+
+        # Step 5.5: Embed chunks into ChromaDB  ← NEW STEP
+        embed_and_store_chunks(db, document.id)
+
         print("STEP 5 DONE")
         
         print("STEP 6: Updating document status...")

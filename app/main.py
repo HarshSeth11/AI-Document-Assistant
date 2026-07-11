@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db, engine, Base
 from app.models import Document
 import app.document_service as document_service
+from app.vector_service import search_chunks, get_collection_stats
 
 Base.metadata.create_all(bind=engine)
 
@@ -90,3 +91,16 @@ def delete_document_route(document_id: str, db: Session = Depends(get_db)):
     if not success:
         raise HTTPException(status_code=404, detail="Document not found")
     return {"status": "success", "message": f"Document {document_id} deleted"}
+
+@app.get("/search")
+def search(query: str, document_id: str = None, n_results: int = 4):
+    results = search_chunks(query, n_results=n_results, document_id=document_id)
+    return {
+        "query": query,
+        "results_count": len(results),
+        "results": results
+    }
+
+@app.get("/debug/chroma-stats")
+def chroma_stats():
+    return get_collection_stats()
