@@ -4,6 +4,7 @@ from app.database import get_db, engine, Base
 from app.models import Document
 import app.document_service as document_service
 from app.vector_service import search_chunks, get_collection_stats
+from app.retrieval_service import retrieve_with_confidence
 
 Base.metadata.create_all(bind=engine)
 
@@ -104,3 +105,34 @@ def search(query: str, document_id: str = None, n_results: int = 4):
 @app.get("/debug/chroma-stats")
 def chroma_stats():
     return get_collection_stats()
+
+
+@app.get("/search/hybrid")
+def hybrid_search_endpoint(
+    query: str, 
+    document_id: str = None, 
+    confidence_threshold: float = 0.7,
+    db: Session = Depends(get_db)
+):
+    result = retrieve_with_confidence(
+        db=db, 
+        query=query, 
+        document_id=document_id,
+        confidence_threshold=confidence_threshold
+    )
+    
+    return {
+        "query": query,
+        "confident": result["confident"],
+        "reason": result["reason"],
+        "chunks_found": len(result["chunks"]),
+        "chunks": [
+            {
+                "content": c["content"][:200] + "...",
+                "source_type": c["source"],
+                "filename": c["metadata"]["filename"],
+                "chunk_index": c["metadata"]["chunk_index"]
+            }
+            for c in result["chunks"]
+        ]
+    }
