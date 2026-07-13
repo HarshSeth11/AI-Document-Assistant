@@ -5,6 +5,8 @@ from app.models import Document
 import app.document_service as document_service
 from app.vector_service import search_chunks, get_collection_stats
 from app.retrieval_service import retrieve_with_confidence
+from app.agent_service import ask_agent
+from pydantic import BaseModel
 
 Base.metadata.create_all(bind=engine)
 
@@ -135,4 +137,16 @@ def hybrid_search_endpoint(
             }
             for c in result["chunks"]
         ]
+    }
+
+class ChatRequest(BaseModel):
+    question: str
+
+@app.post("/chat")
+def chat(request: ChatRequest, db: Session = Depends(get_db)):
+    result = ask_agent(db, request.question)
+    return {
+        "question": request.question,
+        "answer": result["answer"],
+        "tools_used": result["tools_used"]
     }
