@@ -150,3 +150,24 @@ def retrieve_with_confidence(db: Session, query: str, document_id: str = None,
         "confident": True,
         "reason": "OK"
     }
+
+def get_all_chunks_for_document(db: Session, document_id: str) -> list:
+    """Get every chunk for a document, in order — used for summarization"""
+    chunks = db.query(Chunk).filter(
+        Chunk.document_id == document_id
+    ).order_by(Chunk.chunk_index).all()
+    
+    return chunks
+
+def find_document_by_name(db: Session, filename_hint: str) -> Document:
+    """Fuzzy match a document by partial filename — handles spaces/underscores"""
+    
+    # Normalize: replace spaces with wildcards for flexible matching
+    normalized_hint = filename_hint.replace(" ", "%")
+    
+    documents = db.query(Document).filter(
+        Document.filename.ilike(f"%{normalized_hint}%"),
+        Document.status == "ready"
+    ).all()
+    
+    return documents[0] if documents else None
