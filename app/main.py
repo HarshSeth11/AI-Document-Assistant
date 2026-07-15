@@ -1,12 +1,20 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from sqlalchemy.orm import Session
 from app.database import get_db, engine, Base
-from app.models import Document
+from app.models import Document, ChatSession
 import app.document_service as document_service
 from app.vector_service import search_chunks, get_collection_stats
 from app.retrieval_service import retrieve_with_confidence
 from app.agent_service import ask_agent
 from pydantic import BaseModel
+from app.session_service import (
+    get_or_create_session, 
+    load_conversation_history, 
+    save_message,
+    get_session_history,
+    generate_session_title
+)
+from typing import Optional
 
 Base.metadata.create_all(bind=engine)
 
@@ -141,12 +149,56 @@ def hybrid_search_endpoint(
 
 class ChatRequest(BaseModel):
     question: str
+    session_id: Optional[str] = None
+    user_id: str = None
 
 @app.post("/chat")
 def chat(request: ChatRequest, db: Session = Depends(get_db)):
-    result = ask_agent(db, request.question)
+    # Get or create session
+    session = get_or_create_session(db, request.session_id, request.user_id)
+    
+    # Load history BEFORE adding the new message
+    history = load_conversation_history(db, session.id, max_messages=10)
+    
+    # Ask the agent with full context
+    result = ask_agent(db, request.question, conversation_history=history)
+    
+    # Save both messages to PostgreSQL
+    save_message(db, session.id, "user", request.question)
+    save_message(db, session.id, "assistant", result["answer"], tools_used=result["tools_used"])
+    
+    # Set a readable session title from the first message
+    generate_session_title(db, session.id, request.question)
+    
     return {
+        "session_id": session.id,
         "question": request.question,
         "answer": result["answer"],
         "tools_used": result["tools_used"]
     }
+
+@app.get("/chat/history/{session_id}")
+def chat_history(session_id: str, db: Session = Depends(get_db)):
+    history = get_session_history(db, session_id)
+    if not history:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return history
+
+@app.get("/chat/sessions")
+def list_sessions(user_id: Optional[str] = None, db: Session = Depends(get_db)):
+    if not user_id:
+        return {"message": "user_id required to list sessions, or implement auth to identify user automatically"}
+    
+    sessions = db.query(ChatSession).filter(
+        ChatSession.user_id == user_id
+    ).order_by(ChatSession.last_active.desc()).all()
+    
+    return [
+        {
+            "session_id": s.id,
+            "title": s.title,
+            "created_at": s.created_at,
+            "last_active": s.last_active
+        }
+        for s in sessions
+    ]

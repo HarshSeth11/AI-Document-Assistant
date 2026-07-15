@@ -204,7 +204,7 @@ graph.add_conditional_edges("tools", route_after_tools, {END: END, "agent": "age
 rag_agent_app = graph.compile()
 
 # ── Public function ──
-def ask_agent(db: Session, question: str) -> dict:
+def ask_agent(db: Session, question: str, conversation_history: list = None) -> dict:
     system_prompt = """You are DocuMind, an AI assistant that helps users find information in their uploaded documents.
 
 Rules:
@@ -217,19 +217,22 @@ Rules:
 - Use list_available_documents if the user asks what documents exist.
 - IMPORTANT: Once a tool returns useful information that answers the user's question, generate your final answer immediately. Do not call additional unnecessary tools."""
 
+    # Build message list: system + history + new question
+    messages = [SystemMessage(content=system_prompt)]
+    
+    if conversation_history:
+        messages.extend(conversation_history)
+    
+    messages.append(HumanMessage(content=question))
 
     result = rag_agent_app.invoke({
-        "messages": [
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=question)
-        ],
+        "messages": messages,
         "db_session": db,
         "terminal_tool_used": False
     })
 
     final_message = result["messages"][-1]
     
-    # If the graph ended right after a tool call, the last message IS the tool result
     if isinstance(final_message, ToolMessage):
         answer_text = final_message.content
     else:
