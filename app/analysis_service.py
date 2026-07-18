@@ -2,6 +2,7 @@ import os
 from groq import Groq
 from sqlalchemy.orm import Session
 from app.retrieval_service import get_all_chunks_for_document, find_document_by_name
+from app.models import Chunk, Document
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -54,9 +55,21 @@ def compare_documents(db: Session, doc1_hint: str, doc2_hint: str) -> str:
     doc2 = find_document_by_name(db, doc2_hint)
     
     if not doc1:
-        return f"No document found matching '{doc1_hint}'"
+        docs = db.query(Document).filter(Document.status == "ready").all()
+        available = "\n".join(f"- {d.filename}" for d in docs)
+
+        return (
+            f"No document found matching '{doc1_hint}'.\n\n"
+            f"Available documents:\n{available}"
+        )
     if not doc2:
-        return f"No document found matching '{doc2_hint}'"
+        docs = db.query(Document).filter(Document.status == "ready").all()
+        available = "\n".join(f"- {d.filename}" for d in docs)
+
+        return (
+            f"No document found matching '{doc2_hint}'.\n\n"
+            f"Available documents:\n{available}"
+        )
     
     chunks1 = get_all_chunks_for_document(db, doc1.id)
     chunks2 = get_all_chunks_for_document(db, doc2.id)

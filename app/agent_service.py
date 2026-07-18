@@ -161,13 +161,11 @@ def tool_node(state: AgentState) -> AgentState:
 
         elif tool_name == "summarize_document":
             result_text = summarize_document(db, tool_args["document_name"])
-            if not result_text.startswith("No document found"):
-                terminal_used = True  # ✅ mark success — force stop after this
+            terminal_used = True  # ✅ mark success — force stop after this
 
         elif tool_name == "compare_documents":
             result_text = compare_documents(db, tool_args["document_a"], tool_args["document_b"])
-            if "No document found" not in result_text:
-                terminal_used = True  # ✅ mark success — force stop after this
+            terminal_used = True  # ✅ mark success — force stop after this
 
         else:
             result_text = f"Unknown tool: {tool_name}"
@@ -210,7 +208,7 @@ def ask_agent(db: Session, question: str, conversation_history: list = None) -> 
 Rules:
 - ALWAYS use search_documents for specific questions about policies, procedures, or document content.
 - Use summarize_document when the user wants an overview or summary of a whole document. Once you get a summary result, use it directly as your final answer — do NOT call search_documents afterward.
-- Use compare_documents when the user wants to compare two documents. Once you get a comparison result, use it directly as your final answer.
+- Use compare_documents when the user wants to compare two documents. Once you get a comparison result, use it directly as your final answer. If any document is missing response No document found matching and provide the available documents present in the db.
 - If search returns "No relevant information found", tell the user honestly — do not make up an answer.
 - Always cite which document/source your answer comes from.
 - For general greetings or questions unrelated to documents, respond naturally without searching.

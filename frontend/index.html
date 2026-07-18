@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DocuMind — AI Document Assistant</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    padding: 20px 24px;
+    border-bottom: 1px solid #1e293b;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  header h1 { font-size: 20px; font-weight: 700; }
+  header .status { font-size: 13px; color: #64748b; }
+  .status.ready { color: #22c55e; }
+
+  .main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  .sidebar {
+    width: 280px;
+    border-right: 1px solid #1e293b;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .sidebar h2 { font-size: 13px; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; }
+
+  .upload-box {
+    border: 2px dashed #334155;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .upload-box:hover { border-color: #6366f1; }
+  .upload-box input { display: none; }
+
+  .doc-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex: 1; }
+  .doc-item {
+    background: #1e293b;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+  .doc-item .fname { font-weight: 600; }
+  .doc-item .fmeta { color: #64748b; font-size: 11px; margin-top: 2px; }
+
+  .chat-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .msg {
+    max-width: 70%;
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 14px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+  }
+  .msg.user {
+    align-self: flex-end;
+    background: #6366f1;
+    color: white;
+  }
+  .msg.assistant {
+    align-self: flex-start;
+    background: #1e293b;
+  }
+  .msg .tools {
+    font-size: 11px;
+    color: #94a3b8;
+    margin-top: 6px;
+  }
+
+  .input-area {
+    padding: 16px 24px;
+    border-top: 1px solid #1e293b;
+    display: flex;
+    gap: 12px;
+  }
+  .input-area input {
+    flex: 1;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 12px 16px;
+    color: #e2e8f0;
+    font-size: 14px;
+  }
+  .input-area input:focus { outline: none; border-color: #6366f1; }
+  .input-area button {
+    background: #6366f1;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 24px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .input-area button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #64748b;
+    gap: 8px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📄 DocuMind</h1>
+  <span class="status" id="status">Connecting...</span>
+</header>
+
+<div class="main">
+  <div class="sidebar">
+    <h2>Upload Document</h2>
+    <div class="upload-box" onclick="document.getElementById('fileInput').click()">
+      <input type="file" id="fileInput" accept=".txt,.pdf">
+      <div>📎 Click to upload</div>
+      <div style="font-size:11px; color:#64748b; margin-top:4px;">PDF or TXT</div>
+    </div>
+    <h2>Documents</h2>
+    <div class="doc-list" id="docList"></div>
+  </div>
+
+  <div class="chat-area">
+    <div class="messages" id="messages">
+      <div class="empty-state" id="emptyState">
+        <div style="font-size:32px;">💬</div>
+        <div>Ask me anything about your documents</div>
+      </div>
+    </div>
+    <div class="input-area">
+      <input type="text" id="questionInput" placeholder="Ask a question, or try 'summarize X' or 'compare X and Y'..." />
+      <button id="sendBtn" onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_BASE = "http://127.0.0.1:8000";
+let sessionId = null;
+let userId = "user_" + Math.random().toString(36).substring(7);
+
+async function checkHealth() {
+  try {
+    const res = await fetch(`${API_BASE}/health`);
+    const data = await res.json();
+    document.getElementById("status").textContent = "● " + data.message;
+    document.getElementById("status").classList.add("ready");
+  } catch (e) {
+    document.getElementById("status").textContent = "● Backend offline";
+  }
+}
+
+async function loadDocuments() {
+  try {
+    const res = await fetch(`${API_BASE}/documents`);
+    const docs = await res.json();
+    const list = document.getElementById("docList");
+    list.innerHTML = docs.map(d => `
+      <div class="doc-item">
+        <div class="fname">${d.filename}</div>
+        <div class="fmeta">${d.chunk_count} chunks · ${d.status}</div>
+      </div>
+    `).join("");
+  } catch (e) {
+    console.error("Failed to load documents", e);
+  }
+}
+
+document.getElementById("fileInput").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  document.getElementById("status").textContent = "● Uploading & processing...";
+
+  try {
+    const res = await fetch(`${API_BASE}/documents/upload`, {
+      method: "POST",
+      body: formData
+    });
+    const data = await res.json();
+    if (res.ok) {
+      await loadDocuments();
+      document.getElementById("status").textContent = "● Ready";
+    } else {
+      alert("Upload failed: " + data.detail);
+    }
+  } catch (err) {
+    alert("Upload error: " + err.message);
+  }
+});
+
+function appendMessage(role, content, toolsUsed) {
+  document.getElementById("emptyState")?.remove();
+  const messagesDiv = document.getElementById("messages");
+  const msgDiv = document.createElement("div");
+  msgDiv.className = `msg ${role}`;
+  msgDiv.textContent = content;
+
+  if (toolsUsed && toolsUsed.length > 0) {
+    const toolsSpan = document.createElement("div");
+    toolsSpan.className = "tools";
+    toolsSpan.textContent = "🔧 " + toolsUsed.join(", ");
+    msgDiv.appendChild(toolsSpan);
+  }
+
+  messagesDiv.appendChild(msgDiv);
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+
+async function sendMessage() {
+  const input = document.getElementById("questionInput");
+  const question = input.value.trim();
+  if (!question) return;
+
+  const sendBtn = document.getElementById("sendBtn");
+  sendBtn.disabled = true;
+  input.value = "";
+
+  appendMessage("user", question);
+
+  try {
+    const res = await fetch(`${API_BASE}/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        question: question,
+        session_id: sessionId,
+        user_id: userId
+      })
+    });
+    const data = await res.json();
+
+    if (res.ok) {
+      sessionId = data.session_id;
+      appendMessage("assistant", data.answer, data.tools_used);
+    } else {
+      appendMessage("assistant", "Error: " + data.detail);
+    }
+  } catch (err) {
+    appendMessage("assistant", "Connection error: " + err.message);
+  }
+
+  sendBtn.disabled = false;
+}
+
+document.getElementById("questionInput").addEventListener("keypress", (e) => {
+  if (e.key === "Enter") sendMessage();
+});
+
+checkHealth();
+loadDocuments();
+</script>
+
+</body>
+</html>
